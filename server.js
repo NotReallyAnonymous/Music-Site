@@ -4,7 +4,8 @@ const express = require("express");
 const chokidar = require("chokidar");
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3119;
+const HOST = process.env.HOST || "0.0.0.0";
 const MUSIC_DIR = path.join(__dirname, "music");
 
 app.set("view engine", "ejs");
@@ -112,6 +113,6 @@ watcher.on("addDir", broadcastReload);
 watcher.on("unlinkDir", broadcastReload);
 watcher.on("change", broadcastReload);
 
-app.listen(PORT, () => {
-  console.log(`Music site running at http://localhost:${PORT}`);
+app.listen(PORT, HOST, () => {
+  console.log(`Music site running at http://${HOST}:${PORT}`);
 });
