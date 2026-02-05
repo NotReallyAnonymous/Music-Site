@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title><%= projectName %> | Music Projects</title>
+    <link rel="stylesheet" href="/static/styles.css" />
+  </head>
+  <body>
+    <header class="hero hero--compact">
+      <div>
+        <p class="breadcrumb"><a href="/">← Back to projects</a></p>
+        <h1><%= projectName %></h1>
+        <p>Latest demo and previous versions ready to play.</p>
+      </div>
+    </header>
+    <main class="container">
+      <% if (demos.length === 0) { %>
+        <div class="empty-state">
+          <p>No demo files yet. Add .wav files to <code>music/<%= projectName %></code>.</p>
+        </div>
+      <% } else { %>
+        <section class="latest-demo">
+          <h2>Latest demo</h2>
+          <div class="demo-card demo-card--featured">
+            <div>
+              <p class="demo-title"><%= projectName %></p>
+              <p class="demo-version">version <%= demos[0].name %></p>
+            </div>
+            <audio controls preload="none" src="/music/<%= encodeURIComponent(projectName) %>/<%= encodeURIComponent(demos[0].name) %>"></audio>
+          </div>
+        </section>
+        <% if (demos.length > 1) { %>
+          <section class="previous-demos">
+            <h3>Previous versions</h3>
+            <div class="demo-grid">
+              <% demos.slice(1).forEach((demo) => { %>
+                <div class="demo-card">
+                  <div>
+                    <p class="demo-title"><%= projectName %></p>
+                    <p class="demo-version">version <%= demo.name %></p>
+                  </div>
+                  <audio controls preload="none" src="/music/<%= encodeURIComponent(projectName) %>/<%= encodeURIComponent(demo.name) %>"></audio>
+                </div>
+              <% }) %>
+            </div>
+          </section>
+        <% } %>
+      <% } %>
+    </main>
+    <script>
+      const events = new EventSource("/events");
+      events.addEventListener("message", (event) => {
+        if (event.data === "reload") {
+          window.location.reload();
+        }
+      });
+    </script>
+  </body>
+</html>
