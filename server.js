@@ -42,6 +42,7 @@ const getDemos = async (projectName) => {
       const fileStats = await fs.promises.stat(fullPath);
       return {
         name: file,
+        displayName: path.parse(file).name,
         mtimeMs: fileStats.mtimeMs,
       };
     })

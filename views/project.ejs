@@ -25,7 +25,7 @@
           <div class="demo-card demo-card--featured">
             <div>
               <p class="demo-title"><%= projectName %></p>
-              <p class="demo-version">version <%= demos[0].name %></p>
+              <p class="demo-version">version <%= demos[0].displayName %></p>
             </div>
             <audio controls preload="none" src="/music/<%= encodeURIComponent(projectName) %>/<%= encodeURIComponent(demos[0].name) %>"></audio>
           </div>
@@ -38,7 +38,7 @@
                 <div class="demo-card">
                   <div>
                     <p class="demo-title"><%= projectName %></p>
-                    <p class="demo-version">version <%= demo.name %></p>
+                    <p class="demo-version">version <%= demo.displayName %></p>
                   </div>
                   <audio controls preload="none" src="/music/<%= encodeURIComponent(projectName) %>/<%= encodeURIComponent(demo.name) %>"></audio>
                 </div>
