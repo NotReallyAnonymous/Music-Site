@@ -122,6 +122,12 @@ a {
   font-size: 0.9rem;
 }
 
+.demo-modified {
+  margin: 0.35rem 0 0;
+  color: #9aa7c5;
+  font-size: 0.85rem;
+}
+
 .previous-demos {
   margin-top: 2rem;
 }

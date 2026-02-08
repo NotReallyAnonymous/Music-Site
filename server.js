@@ -40,10 +40,18 @@ const getDemos = async (projectName) => {
     wavFiles.map(async (file) => {
       const fullPath = path.join(projectPath, file);
       const fileStats = await fs.promises.stat(fullPath);
+      const modifiedAt = new Date(fileStats.mtimeMs);
       return {
         name: file,
         displayName: path.parse(file).name,
         mtimeMs: fileStats.mtimeMs,
+        modifiedAtLabel: modifiedAt.toLocaleString(undefined, {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        }),
       };
     })
   );
