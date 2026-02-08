@@ -40,7 +40,7 @@ const getDemos = async (projectName) => {
     wavFiles.map(async (file) => {
       const fullPath = path.join(projectPath, file);
       const fileStats = await fs.promises.stat(fullPath);
-      const modifiedAt = new Date(fileStats.mtimeMs);
+      const modifiedAt = fileStats.mtime;
       return {
         name: file,
         displayName: path.parse(file).name,
