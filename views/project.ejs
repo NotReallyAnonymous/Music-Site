@@ -70,7 +70,11 @@
                   <p class="demo-version">version <%= demos[0].displayName %></p>
                   <p class="demo-modified">Modified <%= demos[0].modifiedAtLabel %></p>
                 </div>
-                <audio controls preload="none" src="/music/<%= encodeURIComponent(projectName) %>/<%= encodeURIComponent(demos[0].name) %>"></audio>
+                <audio
+                  controls
+                  preload="metadata"
+                  src="/music/<%= encodeURIComponent(projectName) %>/<%= encodeURIComponent(demos[0].name) %>"
+                ></audio>
               </div>
             </section>
             <% if (demos.length > 1) { %>
@@ -84,7 +88,11 @@
                         <p class="demo-version">version <%= demo.displayName %></p>
                         <p class="demo-modified">Modified <%= demo.modifiedAtLabel %></p>
                       </div>
-                      <audio controls preload="none" src="/music/<%= encodeURIComponent(projectName) %>/<%= encodeURIComponent(demo.name) %>"></audio>
+                      <audio
+                        controls
+                        preload="none"
+                        src="/music/<%= encodeURIComponent(projectName) %>/<%= encodeURIComponent(demo.name) %>"
+                      ></audio>
                     </div>
                   <% }) %>
                 </div>
@@ -127,6 +135,7 @@
           }
         });
       }
+
     </script>
   </body>
 </html>

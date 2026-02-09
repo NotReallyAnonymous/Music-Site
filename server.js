@@ -12,6 +12,62 @@ app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
 app.use("/static", express.static(path.join(__dirname, "public")));
+
+app.get("/music/:project/:file", async (req, res, next) => {
+  try {
+    const projectName = req.params.project;
+    const fileName = req.params.file;
+    const resolvedPath = path.resolve(MUSIC_DIR, projectName, fileName);
+
+    if (!resolvedPath.startsWith(MUSIC_DIR + path.sep)) {
+      res.status(400).send("Invalid file path");
+      return;
+    }
+
+    const stats = await fs.promises.stat(resolvedPath);
+    if (!stats.isFile()) {
+      res.status(404).send("File not found");
+      return;
+    }
+
+    const fileSize = stats.size;
+    const range = req.headers.range;
+    const contentType = path.extname(resolvedPath).toLowerCase() === ".wav" ? "audio/wav" : "application/octet-stream";
+
+    res.set("Accept-Ranges", "bytes");
+
+    if (range) {
+      const parts = range.replace(/bytes=/, "").split("-");
+      const start = parseInt(parts[0], 10);
+      const end = parts[1] ? parseInt(parts[1], 10) : fileSize - 1;
+
+      if (Number.isNaN(start) || Number.isNaN(end) || start >= fileSize || end >= fileSize) {
+        res.status(416).set("Content-Range", `bytes */${fileSize}`).end();
+        return;
+      }
+
+      res.status(206);
+      res.set({
+        "Content-Range": `bytes ${start}-${end}/${fileSize}`,
+        "Content-Length": end - start + 1,
+        "Content-Type": contentType,
+      });
+
+      fs.createReadStream(resolvedPath, { start, end }).pipe(res);
+      return;
+    }
+
+    res.set({
+      "Content-Length": fileSize,
+      "Content-Type": contentType,
+    });
+
+    fs.createReadStream(resolvedPath).pipe(res);
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.use("/music", express.static(MUSIC_DIR));
 
 const ensureMusicDir = async () => {
