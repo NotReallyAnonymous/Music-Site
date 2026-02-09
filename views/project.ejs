@@ -3,53 +3,97 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title><%= projectName %> | Music Projects</title>
+    <title><%= projectName ? `${projectName} | Music Projects` : "Music Projects" %></title>
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
   <body>
-    <header class="hero hero--compact">
-      <div>
-        <p class="breadcrumb"><a href="/">← Back to projects</a></p>
-        <h1><%= projectName %></h1>
-        <p>Latest demo and previous versions ready to play.</p>
-      </div>
-    </header>
-    <main class="container">
-      <% if (demos.length === 0) { %>
-        <div class="empty-state">
-          <p>No demo files yet. Add .wav files to <code>music/<%= projectName %></code>.</p>
-        </div>
-      <% } else { %>
-        <section class="latest-demo">
-          <h2>Latest demo</h2>
-          <div class="demo-card demo-card--featured">
-            <div>
-              <p class="demo-title"><%= projectName %></p>
-              <p class="demo-version">version <%= demos[0].displayName %></p>
-              <p class="demo-modified">Modified <%= demos[0].modifiedAtLabel %></p>
-            </div>
-            <audio controls preload="none" src="/music/<%= encodeURIComponent(projectName) %>/<%= encodeURIComponent(demos[0].name) %>"></audio>
+    <div class="app-shell">
+      <aside class="sidebar" data-sidebar>
+        <div class="sidebar__header">
+          <div>
+            <p class="sidebar__eyebrow">Music Projects</p>
+            <h1 class="sidebar__title">Demo Vault</h1>
           </div>
-        </section>
-        <% if (demos.length > 1) { %>
-          <section class="previous-demos">
-            <h3>Previous versions</h3>
-            <div class="demo-grid">
-              <% demos.slice(1).forEach((demo) => { %>
-                <div class="demo-card">
-                  <div>
-                    <p class="demo-title"><%= projectName %></p>
-                    <p class="demo-version">version <%= demo.displayName %></p>
-                    <p class="demo-modified">Modified <%= demo.modifiedAtLabel %></p>
-                  </div>
-                  <audio controls preload="none" src="/music/<%= encodeURIComponent(projectName) %>/<%= encodeURIComponent(demo.name) %>"></audio>
-                </div>
-              <% }) %>
-            </div>
-          </section>
+          <button class="sidebar__close" type="button" data-sidebar-toggle aria-label="Toggle project list">☰</button>
+        </div>
+        <% if (projects.length === 0) { %>
+          <p class="sidebar__empty">No projects yet. Add folders in <code>music</code>.</p>
+        <% } else { %>
+          <nav class="sidebar__nav">
+            <% projects.forEach((project) => { %>
+              <a
+                class="sidebar__link <%= projectName === project.name ? 'is-active' : '' %>"
+                href="/project/<%= encodeURIComponent(project.name) %>"
+              >
+                <span><%= project.name %></span>
+                <span class="sidebar__meta">Latest demo</span>
+              </a>
+            <% }) %>
+          </nav>
         <% } %>
-      <% } %>
-    </main>
+      </aside>
+      <main class="main">
+        <header class="main__header">
+          <div>
+            <p class="main__eyebrow">Retro demo stack</p>
+            <h2 class="main__title"><%= projectName || "No project selected" %></h2>
+            <p class="main__subtitle">
+              <% if (projectName) { %>
+                Latest demo and previous versions ready to play.
+              <% } else { %>
+                Drop .wav files into <code>music</code> to populate the sidebar.
+              <% } %>
+            </p>
+          </div>
+          <div class="main__actions">
+            <button class="ghost-button" type="button" data-sidebar-toggle aria-label="Toggle project list">☰</button>
+            <% if (projectName) { %>
+              <button class="primary-button" type="button" data-share-button>Share link</button>
+            <% } %>
+          </div>
+        </header>
+        <section class="content">
+          <% if (!projectName) { %>
+            <div class="empty-state">
+              <p>No projects yet. Create a folder inside <code>music</code> to get started.</p>
+            </div>
+          <% } else if (demos.length === 0) { %>
+            <div class="empty-state">
+              <p>No demo files yet. Add .wav files to <code>music/<%= projectName %></code>.</p>
+            </div>
+          <% } else { %>
+            <section class="latest-demo">
+              <h3>Latest demo</h3>
+              <div class="demo-card demo-card--featured">
+                <div>
+                  <p class="demo-title"><%= projectName %></p>
+                  <p class="demo-version">version <%= demos[0].displayName %></p>
+                  <p class="demo-modified">Modified <%= demos[0].modifiedAtLabel %></p>
+                </div>
+                <audio controls preload="none" src="/music/<%= encodeURIComponent(projectName) %>/<%= encodeURIComponent(demos[0].name) %>"></audio>
+              </div>
+            </section>
+            <% if (demos.length > 1) { %>
+              <section class="previous-demos">
+                <h3>Previous versions</h3>
+                <div class="demo-grid">
+                  <% demos.slice(1).forEach((demo) => { %>
+                    <div class="demo-card">
+                      <div>
+                        <p class="demo-title"><%= projectName %></p>
+                        <p class="demo-version">version <%= demo.displayName %></p>
+                        <p class="demo-modified">Modified <%= demo.modifiedAtLabel %></p>
+                      </div>
+                      <audio controls preload="none" src="/music/<%= encodeURIComponent(projectName) %>/<%= encodeURIComponent(demo.name) %>"></audio>
+                    </div>
+                  <% }) %>
+                </div>
+              </section>
+            <% } %>
+          <% } %>
+        </section>
+      </main>
+    </div>
     <script>
       const events = new EventSource("/events");
       events.addEventListener("message", (event) => {
@@ -57,6 +101,32 @@
           window.location.reload();
         }
       });
+
+      const sidebar = document.querySelector("[data-sidebar]");
+      document.querySelectorAll("[data-sidebar-toggle]").forEach((button) => {
+        button.addEventListener("click", () => {
+          sidebar.classList.toggle("is-open");
+        });
+      });
+
+      const shareButton = document.querySelector("[data-share-button]");
+      if (shareButton) {
+        shareButton.addEventListener("click", async () => {
+          const shareUrl = window.location.href;
+          try {
+            await navigator.clipboard.writeText(shareUrl);
+            shareButton.textContent = "Link copied!";
+            shareButton.classList.add("is-confirmed");
+            setTimeout(() => {
+              shareButton.textContent = "Share link";
+              shareButton.classList.remove("is-confirmed");
+            }, 2000);
+          } catch (error) {
+            console.warn("Unable to copy link", error);
+            window.prompt("Copy this link", shareUrl);
+          }
+        });
+      }
     </script>
   </body>
 </html>
