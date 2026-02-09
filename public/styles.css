@@ -1,8 +1,8 @@
 :root {
   color-scheme: dark;
-  font-family: "Inter", system-ui, -apple-system, sans-serif;
-  background-color: #0f1115;
-  color: #f8f8f8;
+  font-family: "Departure Mono", "Courier New", monospace;
+  background-color: #000035;
+  color: #000035;
 }
 
 * {
@@ -12,7 +12,7 @@
 body {
   margin: 0;
   min-height: 100vh;
-  background: radial-gradient(circle at top, #1a1f2b, #0f1115 60%);
+  background: #000035;
 }
 
 a {
@@ -23,6 +23,10 @@ a {
 .hero {
   padding: 3rem 1.5rem 2rem;
   text-align: center;
+  background: #f4f5ff;
+  border-radius: 1.5rem;
+  margin: 2rem auto 0;
+  max-width: 960px;
 }
 
 .hero--compact {
@@ -38,12 +42,12 @@ a {
 
 .hero p {
   margin: 0;
-  color: #b7c0d1;
+  color: #2c2c6d;
 }
 
 .container {
   max-width: 960px;
-  margin: 0 auto;
+  margin: 2rem auto 0;
   padding: 0 1.5rem 3rem;
 }
 
@@ -62,26 +66,26 @@ a {
   gap: 0.5rem;
   padding: 1.5rem;
   border-radius: 1rem;
-  background: #1a1f2b;
-  border: 1px solid #2a3041;
+  background: #ffffff;
+  border: 1px solid #c7c9ff;
   transition: transform 0.2s ease, border-color 0.2s ease;
 }
 
 .project-card:hover {
   transform: translateY(-4px);
-  border-color: #6b7ba8;
+  border-color: #000035;
 }
 
 .project-card span {
-  color: #8fa0c8;
+  color: #2c2c6d;
   font-size: 0.9rem;
 }
 
 .empty-state {
   padding: 2rem;
   border-radius: 1rem;
-  background: #1a1f2b;
-  border: 1px dashed #2a3041;
+  background: #ffffff;
+  border: 1px dashed #c7c9ff;
   text-align: center;
 }
 
@@ -101,14 +105,14 @@ a {
   gap: 1rem;
   padding: 1rem 1.5rem;
   border-radius: 1rem;
-  background: #1a1f2b;
-  border: 1px solid #2a3041;
+  background: #ffffff;
+  border: 1px solid #c7c9ff;
 }
 
 .demo-card--featured {
   padding: 1.5rem;
-  border-color: #6b7ba8;
-  background: #222a3a;
+  border-color: #000035;
+  background: #e7e9ff;
 }
 
 .demo-title {
@@ -118,13 +122,13 @@ a {
 
 .demo-version {
   margin: 0.25rem 0 0;
-  color: #b7c0d1;
+  color: #2c2c6d;
   font-size: 0.9rem;
 }
 
 .demo-modified {
   margin: 0.35rem 0 0;
-  color: #9aa7c5;
+  color: #3b3b7a;
   font-size: 0.85rem;
 }
 
@@ -134,11 +138,11 @@ a {
 
 .breadcrumb {
   margin-bottom: 0.75rem;
-  color: #8fa0c8;
+  color: #2c2c6d;
 }
 
 code {
-  background: #222a3a;
+  background: #e7e9ff;
   padding: 0.2rem 0.4rem;
   border-radius: 0.3rem;
   font-size: 0.9em;
