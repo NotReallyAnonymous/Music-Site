@@ -91,7 +91,7 @@
                       <audio
                         controls
                         preload="none"
-                        data-src="/music/<%= encodeURIComponent(projectName) %>/<%= encodeURIComponent(demo.name) %>"
+                        src="/music/<%= encodeURIComponent(projectName) %>/<%= encodeURIComponent(demo.name) %>"
                       ></audio>
                     </div>
                   <% }) %>
@@ -136,27 +136,6 @@
         });
       }
 
-      const lazyAudios = document.querySelectorAll("audio[data-src]");
-      const ensureAudioSource = (audio) => {
-        if (audio.dataset.loaded || !audio.dataset.src) {
-          return;
-        }
-        audio.src = audio.dataset.src;
-        audio.dataset.loaded = "true";
-      };
-
-      lazyAudios.forEach((audio) => {
-        audio.addEventListener("play", () => {
-          ensureAudioSource(audio);
-        });
-
-        audio.addEventListener("pointerdown", () => {
-          if (!audio.dataset.loaded) {
-            ensureAudioSource(audio);
-            audio.play().catch(() => {});
-          }
-        });
-      });
     </script>
   </body>
 </html>
