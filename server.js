@@ -20,12 +20,43 @@ const ensureMusicDir = async () => {
 
 const getProjects = async () => {
   const entries = await fs.promises.readdir(MUSIC_DIR, { withFileTypes: true });
-  const dirs = entries
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort((a, b) => a.localeCompare(b));
+  const dirs = entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
 
-  return dirs;
+  const projects = await Promise.all(
+    dirs.map(async (name) => {
+      const projectPath = path.join(MUSIC_DIR, name);
+      let latestDemoMs = 0;
+
+      try {
+        const projectEntries = await fs.promises.readdir(projectPath, { withFileTypes: true });
+        const wavFiles = projectEntries
+          .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".wav"))
+          .map((entry) => entry.name);
+
+        if (wavFiles.length > 0) {
+          const stats = await Promise.all(
+            wavFiles.map(async (file) => {
+              const fullPath = path.join(projectPath, file);
+              const fileStats = await fs.promises.stat(fullPath);
+              return fileStats.mtimeMs;
+            })
+          );
+          latestDemoMs = Math.max(...stats);
+        }
+      } catch (error) {
+        console.warn(`Unable to read project ${name}`, error);
+      }
+
+      return { name, latestDemoMs };
+    })
+  );
+
+  return projects.sort((a, b) => {
+    if (b.latestDemoMs !== a.latestDemoMs) {
+      return b.latestDemoMs - a.latestDemoMs;
+    }
+    return a.name.localeCompare(b.name);
+  });
 };
 
 const getDemos = async (projectName) => {
@@ -63,7 +94,11 @@ app.get("/", async (_req, res, next) => {
   try {
     await ensureMusicDir();
     const projects = await getProjects();
-    res.render("index", { projects });
+    if (projects.length === 0) {
+      res.render("project", { projectName: null, demos: [], projects });
+      return;
+    }
+    res.redirect(`/project/${encodeURIComponent(projects[0].name)}`);
   } catch (error) {
     next(error);
   }
@@ -82,7 +117,8 @@ app.get("/project/:name", async (req, res, next) => {
     }
 
     const demos = await getDemos(projectName);
-    res.render("project", { projectName, demos });
+    const projects = await getProjects();
+    res.render("project", { projectName, demos, projects });
   } catch (error) {
     next(error);
   }
