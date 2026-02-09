@@ -48,7 +48,20 @@
           <div class="main__actions">
             <button class="ghost-button" type="button" data-sidebar-toggle aria-label="Toggle project list">☰</button>
             <% if (projectName) { %>
-              <button class="primary-button" type="button" data-share-button>Share link</button>
+              <button
+                class="primary-button icon-button"
+                type="button"
+                data-share-button
+                aria-label="Copy page link"
+                title="Copy page link"
+              >
+                <span class="sr-only">Copy page link</span>
+                <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                  <path
+                    d="M10.5 13.5H9a4.5 4.5 0 0 1 0-9h1.5a1 1 0 0 1 0 2H9a2.5 2.5 0 0 0 0 5h1.5a1 1 0 0 1 0 2Zm4.5 6H13.5a1 1 0 0 1 0-2H15a2.5 2.5 0 0 0 0-5h-1.5a1 1 0 0 1 0-2H15a4.5 4.5 0 0 1 0 9Zm-6-7.5h6a1 1 0 0 1 0 2H9a1 1 0 0 1 0-2Z"
+                  />
+                </svg>
+              </button>
             <% } %>
           </div>
         </header>
@@ -123,11 +136,13 @@
           const shareUrl = window.location.href;
           try {
             await navigator.clipboard.writeText(shareUrl);
-            shareButton.textContent = "Link copied!";
             shareButton.classList.add("is-confirmed");
+            shareButton.setAttribute("aria-label", "Link copied");
+            shareButton.setAttribute("title", "Link copied");
             setTimeout(() => {
-              shareButton.textContent = "Share link";
               shareButton.classList.remove("is-confirmed");
+              shareButton.setAttribute("aria-label", "Copy page link");
+              shareButton.setAttribute("title", "Copy page link");
             }, 2000);
           } catch (error) {
             console.warn("Unable to copy link", error);
