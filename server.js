@@ -8,13 +8,55 @@ const app = express();
 const PORT = process.env.PORT || 3119;
 const HOST = process.env.HOST || "0.0.0.0";
 const MUSIC_DIR = path.join(__dirname, "music");
+const TRUST_PROXY = process.env.TRUST_PROXY === "1";
 
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
+app.set("trust proxy", TRUST_PROXY);
 
 app.use("/static", express.static(path.join(__dirname, "public")));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+const isPrivateIpv4 = (ip) => {
+  const parts = ip.split(".").map((part) => Number(part));
+  if (parts.length !== 4 || parts.some((part) => Number.isNaN(part) || part < 0 || part > 255)) {
+    return false;
+  }
+  if (parts[0] === 10) {
+    return true;
+  }
+  if (parts[0] === 172 && parts[1] >= 16 && parts[1] <= 31) {
+    return true;
+  }
+  return parts[0] === 192 && parts[1] === 168;
+};
+
+const isLocalNetworkIp = (ip) => {
+  if (!ip) {
+    return false;
+  }
+  const normalized = ip.startsWith("::ffff:") ? ip.slice(7) : ip;
+  if (normalized === "::1" || normalized === "127.0.0.1") {
+    return true;
+  }
+  if (normalized.includes(":")) {
+    return normalized.startsWith("fc") || normalized.startsWith("fd");
+  }
+  return isPrivateIpv4(normalized);
+};
+
+const getRequestIps = (req) => (TRUST_PROXY ? req.ips : [req.ip]);
+
+const restrictMutationsToLocal = (req, res, next) => {
+  const requestIps = getRequestIps(req);
+  const allowed = requestIps.some((ip) => isLocalNetworkIp(ip));
+  if (!allowed) {
+    res.status(403).json({ error: "Editing is restricted to the local network." });
+    return;
+  }
+  next();
+};
 
 app.get("/music/:project/:file", async (req, res, next) => {
   try {
@@ -199,7 +241,7 @@ app.get("/project/:name", async (req, res, next) => {
   }
 });
 
-app.post("/api/projects", async (req, res) => {
+app.post("/api/projects", restrictMutationsToLocal, async (req, res) => {
   try {
     await ensureMusicDir();
     const rawName = typeof req.body.name === "string" ? req.body.name : "";
@@ -232,7 +274,7 @@ app.post("/api/projects", async (req, res) => {
   }
 });
 
-app.put("/api/projects/:name", async (req, res) => {
+app.put("/api/projects/:name", restrictMutationsToLocal, async (req, res) => {
   try {
     await ensureMusicDir();
     const currentName = req.params.name;
@@ -264,7 +306,7 @@ app.put("/api/projects/:name", async (req, res) => {
   }
 });
 
-app.delete("/api/projects/:name", async (req, res) => {
+app.delete("/api/projects/:name", restrictMutationsToLocal, async (req, res) => {
   try {
     await ensureMusicDir();
     const projectName = req.params.name;
@@ -316,7 +358,7 @@ const upload = multer({
   },
 });
 
-app.post("/api/projects/:name/upload", (req, res) => {
+app.post("/api/projects/:name/upload", restrictMutationsToLocal, (req, res) => {
   upload.single("demo")(req, res, (error) => {
     if (error) {
       res.status(400).json({ error: error.message });
@@ -326,7 +368,7 @@ app.post("/api/projects/:name/upload", (req, res) => {
   });
 });
 
-app.put("/api/projects/:name/demos/:file", async (req, res) => {
+app.put("/api/projects/:name/demos/:file", restrictMutationsToLocal, async (req, res) => {
   try {
     const projectName = req.params.name;
     const currentFile = req.params.file;
@@ -360,7 +402,7 @@ app.put("/api/projects/:name/demos/:file", async (req, res) => {
   }
 });
 
-app.delete("/api/projects/:name/demos/:file", async (req, res) => {
+app.delete("/api/projects/:name/demos/:file", restrictMutationsToLocal, async (req, res) => {
   try {
     const projectName = req.params.name;
     const fileName = req.params.file;
