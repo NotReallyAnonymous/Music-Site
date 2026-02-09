@@ -167,6 +167,14 @@ code {
   max-width: 34rem;
 }
 
+.auth-status {
+  margin: 0.5rem 0 0;
+  font-size: 0.8rem;
+  color: rgba(233, 251, 255, 0.65);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
 .main__actions {
   display: flex;
   align-items: center;
@@ -400,6 +408,12 @@ audio {
   color: var(--neon-magenta);
 }
 
+.modal__helper {
+  margin: 0 0 1rem;
+  color: rgba(233, 251, 255, 0.7);
+  font-size: 0.9rem;
+}
+
 .modal__actions {
   display: flex;
   justify-content: flex-end;
@@ -427,6 +441,16 @@ audio {
   color: inherit;
   padding: 0.6rem 0.75rem;
   font-family: inherit;
+}
+
+body.is-locked [data-auth-control] {
+  opacity: 0.45;
+  pointer-events: none;
+}
+
+[data-auth-setup-form],
+[data-auth-login-form] {
+  display: none;
 }
 
 @media (max-width: 960px) {

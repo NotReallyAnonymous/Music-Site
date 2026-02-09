@@ -15,7 +15,15 @@
             <h1 class="sidebar__title">Launchbay Records</h1>
           </div>
           <div class="sidebar__header-actions">
-            <button class="icon-button ghost-button" type="button" data-new-project aria-label="Create new project">＋</button>
+            <button
+              class="icon-button ghost-button"
+              type="button"
+              data-new-project
+              data-auth-control
+              aria-label="Create new project"
+            >
+              ＋
+            </button>
             <button class="sidebar__close" type="button" data-sidebar-toggle aria-label="Toggle project list">☰</button>
           </div>
         </div>
@@ -33,7 +41,7 @@
                   <span class="sidebar__meta">Latest demo</span>
                 </a>
                 <div class="menu" data-menu>
-                  <button class="menu__trigger" type="button" data-menu-trigger aria-label="Project options">⋮</button>
+                  <button class="menu__trigger" type="button" data-menu-trigger data-auth-control aria-label="Project options">⋮</button>
                   <div class="menu__content">
                     <button class="menu__item" type="button" data-action="rename-project" data-project="<%= project.name %>">
                       Rename
@@ -61,12 +69,13 @@
                 Drop .wav files into <code>music</code> to populate the sidebar.
               <% } %>
             </p>
+            <p class="auth-status" data-auth-status></p>
           </div>
           <div class="main__actions">
             <button class="ghost-button ghost-button--mobile" type="button" data-sidebar-toggle aria-label="Toggle project list">☰</button>
             <% if (projectName) { %>
               <input class="sr-only" type="file" accept=".wav" data-upload-input />
-              <button class="primary-button" type="button" data-upload-button>Upload demo</button>
+              <button class="primary-button" type="button" data-upload-button data-auth-control>Upload demo</button>
               <button
                 class="primary-button icon-button"
                 type="button"
@@ -94,6 +103,7 @@
                 </svg>
               </button>
             <% } %>
+            <button class="ghost-button" type="button" data-auth-toggle>Unlock editing</button>
           </div>
         </header>
         <section class="content">
@@ -121,7 +131,7 @@
                     src="/music/<%= encodeURIComponent(projectName) %>/<%= encodeURIComponent(demos[0].name) %>"
                   ></audio>
                   <div class="menu" data-menu>
-                    <button class="menu__trigger" type="button" data-menu-trigger aria-label="Demo options">⋮</button>
+                    <button class="menu__trigger" type="button" data-menu-trigger data-auth-control aria-label="Demo options">⋮</button>
                     <div class="menu__content">
                       <button
                         class="menu__item"
@@ -164,7 +174,7 @@
                           src="/music/<%= encodeURIComponent(projectName) %>/<%= encodeURIComponent(demo.name) %>"
                         ></audio>
                         <div class="menu" data-menu>
-                          <button class="menu__trigger" type="button" data-menu-trigger aria-label="Demo options">⋮</button>
+                          <button class="menu__trigger" type="button" data-menu-trigger data-auth-control aria-label="Demo options">⋮</button>
                           <div class="menu__content">
                             <button
                               class="menu__item"
@@ -216,6 +226,35 @@
         </form>
       </div>
     </div>
+    <div class="modal" data-modal="auth" aria-hidden="true">
+      <div class="modal__backdrop"></div>
+      <div class="modal__panel" role="dialog" aria-modal="true" aria-labelledby="auth-modal-title">
+        <h3 class="modal__title" id="auth-modal-title" data-auth-title>Unlock editing</h3>
+        <p class="modal__helper" data-auth-helper></p>
+        <form data-auth-setup-form>
+          <label class="field">
+            <span class="field__label">New password</span>
+            <input class="field__input" type="password" name="password" minlength="8" required />
+          </label>
+          <label class="field">
+            <span class="field__label">Confirm password</span>
+            <input class="field__input" type="password" name="confirm" minlength="8" required />
+          </label>
+          <div class="modal__actions">
+            <button class="primary-button" type="submit">Set password</button>
+          </div>
+        </form>
+        <form data-auth-login-form>
+          <label class="field">
+            <span class="field__label">Password</span>
+            <input class="field__input" type="password" name="password" minlength="8" required />
+          </label>
+          <div class="modal__actions">
+            <button class="primary-button" type="submit">Unlock editing</button>
+          </div>
+        </form>
+      </div>
+    </div>
     <script>
       const events = new EventSource("/events");
       events.addEventListener("message", (event) => {
@@ -223,6 +262,16 @@
           window.location.reload();
         }
       });
+
+      const authModal = document.querySelector('[data-modal="auth"]');
+      const authTitle = document.querySelector("[data-auth-title]");
+      const authHelper = document.querySelector("[data-auth-helper]");
+      const authStatus = document.querySelector("[data-auth-status]");
+      const authToggleButton = document.querySelector("[data-auth-toggle]");
+      const authControls = document.querySelectorAll("[data-auth-control]");
+      const authSetupForm = document.querySelector("[data-auth-setup-form]");
+      const authLoginForm = document.querySelector("[data-auth-login-form]");
+      let authState = { configured: false, authenticated: false };
 
       const sidebar = document.querySelector("[data-sidebar]");
       document.querySelectorAll("[data-sidebar-toggle]").forEach((button) => {
@@ -272,10 +321,154 @@
         modal.setAttribute("aria-hidden", "true");
       };
 
+      const setEditingLocked = (locked) => {
+        document.body.classList.toggle("is-locked", locked);
+        authControls.forEach((control) => {
+          control.toggleAttribute("disabled", locked);
+          control.setAttribute("aria-disabled", locked ? "true" : "false");
+        });
+      };
+
+      const showAuthModal = (mode) => {
+        if (!authModal) return;
+        if (authSetupForm) {
+          authSetupForm.style.display = mode === "setup" ? "block" : "none";
+        }
+        if (authLoginForm) {
+          authLoginForm.style.display = mode === "login" ? "block" : "none";
+        }
+        if (authTitle) {
+          authTitle.textContent = mode === "setup" ? "Set editing password" : "Unlock editing";
+        }
+        if (authHelper) {
+          authHelper.textContent =
+            mode === "setup"
+              ? "Choose a password to unlock all editing actions on this device."
+              : "Enter the password to unlock editing actions on this device.";
+        }
+        openModal(authModal);
+        const focusTarget =
+          mode === "setup" ? authSetupForm?.querySelector("input") : authLoginForm?.querySelector("input");
+        if (focusTarget) {
+          focusTarget.focus();
+        }
+      };
+
+      const updateAuthUi = (state) => {
+        authState = state;
+        const locked = !state.authenticated;
+        setEditingLocked(locked);
+        if (authToggleButton) {
+          authToggleButton.textContent = locked ? "Unlock editing" : "Lock editing";
+        }
+        if (authStatus) {
+          if (!state.configured) {
+            authStatus.textContent = "Editing locked. Set a password to enable edits.";
+          } else if (!state.authenticated) {
+            authStatus.textContent = "Editing locked. Enter your password to enable edits.";
+          } else {
+            authStatus.textContent = "Editing unlocked for this session.";
+          }
+        }
+        if (locked) {
+          showAuthModal(state.configured ? "login" : "setup");
+        } else if (authModal) {
+          closeModal(authModal);
+        }
+      };
+
+      const fetchAuthStatus = async () => {
+        try {
+          const response = await fetch("/api/auth/status");
+          const data = await response.json();
+          updateAuthUi({ configured: Boolean(data.configured), authenticated: Boolean(data.authenticated) });
+        } catch (error) {
+          console.warn("Unable to fetch auth status", error);
+        }
+      };
+
       if (newProjectButton && newProjectModal) {
         newProjectButton.addEventListener("click", () => openModal(newProjectModal));
         newProjectModal.querySelectorAll("[data-modal-close]").forEach((button) => {
           button.addEventListener("click", () => closeModal(newProjectModal));
+        });
+      }
+
+      if (authToggleButton) {
+        authToggleButton.addEventListener("click", async () => {
+          if (authState.authenticated) {
+            try {
+              await fetch("/api/auth/logout", { method: "POST" });
+            } catch (error) {
+              console.warn("Unable to log out", error);
+            }
+            fetchAuthStatus();
+            return;
+          }
+          showAuthModal(authState.configured ? "login" : "setup");
+        });
+      }
+
+      if (authSetupForm) {
+        authSetupForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const formData = new FormData(authSetupForm);
+          const password = formData.get("password").toString();
+          const confirm = formData.get("confirm").toString();
+          if (!password || password.length < 8) {
+            alert("Password must be at least 8 characters.");
+            return;
+          }
+          if (password !== confirm) {
+            alert("Passwords do not match.");
+            return;
+          }
+          try {
+            const response = await fetch("/api/auth/setup", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ password }),
+            });
+            if (!response.ok) {
+              const data = await response.json().catch(() => ({}));
+              alert(data.error || "Unable to set password.");
+              return;
+            }
+            authSetupForm.reset();
+            fetchAuthStatus();
+          } catch (error) {
+            console.warn("Unable to set password", error);
+            alert("Unable to set password.");
+          }
+        });
+      }
+
+      if (authLoginForm) {
+        authLoginForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const formData = new FormData(authLoginForm);
+          const password = formData.get("password").toString();
+          if (!password) {
+            alert("Enter your password.");
+            return;
+          }
+          try {
+            const response = await fetch("/api/auth/login", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ password }),
+            });
+            if (!response.ok) {
+              const data = await response.json().catch(() => ({}));
+              alert(data.error || "Unable to authenticate.");
+              return;
+            }
+            authLoginForm.reset();
+            fetchAuthStatus();
+          } catch (error) {
+            console.warn("Unable to authenticate", error);
+            alert("Unable to authenticate.");
+          }
         });
       }
 
@@ -372,6 +565,9 @@
         });
         if (!response.ok) {
           const data = await response.json().catch(() => ({}));
+          if (response.status === 401) {
+            showAuthModal(authState.configured ? "login" : "setup");
+          }
           throw new Error(data.error || "Request failed.");
         }
         return response.json().catch(() => ({}));
@@ -432,6 +628,7 @@
         }
       });
 
+      fetchAuthStatus();
     </script>
   </body>
 </html>

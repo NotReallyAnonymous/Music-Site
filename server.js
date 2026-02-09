@@ -1,5 +1,6 @@
 const path = require("path");
 const fs = require("fs");
+const crypto = require("crypto");
 const express = require("express");
 const chokidar = require("chokidar");
 const multer = require("multer");
@@ -9,6 +10,9 @@ const PORT = process.env.PORT || 3119;
 const HOST = process.env.HOST || "0.0.0.0";
 const MUSIC_DIR = path.join(__dirname, "music");
 const TRUST_PROXY = process.env.TRUST_PROXY === "1";
+const AUTH_FILE = path.join(__dirname, "auth.json");
+const SESSION_COOKIE = "music_auth";
+const PASSWORD_MIN_LENGTH = 8;
 
 app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
@@ -17,6 +21,86 @@ app.set("trust proxy", TRUST_PROXY);
 app.use("/static", express.static(path.join(__dirname, "public")));
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
+
+const loadAuthConfig = () => {
+  try {
+    const raw = fs.readFileSync(AUTH_FILE, "utf8");
+    const data = JSON.parse(raw);
+    if (data && data.hash && data.salt && data.iterations && data.digest) {
+      return data;
+    }
+  } catch (error) {
+    return null;
+  }
+  return null;
+};
+
+let authConfig = loadAuthConfig();
+const sessionTokens = new Set();
+
+const parseCookies = (cookieHeader) => {
+  if (!cookieHeader) {
+    return {};
+  }
+  return cookieHeader.split(";").reduce((acc, pair) => {
+    const [name, ...rest] = pair.trim().split("=");
+    if (!name) {
+      return acc;
+    }
+    acc[name] = decodeURIComponent(rest.join("="));
+    return acc;
+  }, {});
+};
+
+const getAuthToken = (req) => parseCookies(req.headers.cookie || "")[SESSION_COOKIE];
+
+const isAuthenticated = (req) => {
+  const token = getAuthToken(req);
+  return Boolean(token && sessionTokens.has(token));
+};
+
+const setSessionCookie = (req, res, token) => {
+  const isSecure = req.secure || req.headers["x-forwarded-proto"] === "https";
+  res.cookie(SESSION_COOKIE, token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: isSecure,
+    maxAge: 1000 * 60 * 60 * 12,
+  });
+};
+
+const clearSessionCookie = (res) => {
+  res.clearCookie(SESSION_COOKIE, { httpOnly: true, sameSite: "lax" });
+};
+
+const createPasswordHash = (password) => {
+  const salt = crypto.randomBytes(16).toString("base64");
+  const iterations = 120000;
+  const digest = "sha512";
+  const hash = crypto.pbkdf2Sync(password, salt, iterations, 64, digest).toString("base64");
+  return { salt, hash, iterations, digest };
+};
+
+const verifyPassword = (password, config) => {
+  const derived = crypto.pbkdf2Sync(password, config.salt, config.iterations, 64, config.digest);
+  const stored = Buffer.from(config.hash, "base64");
+  if (stored.length !== derived.length) {
+    return false;
+  }
+  return crypto.timingSafeEqual(stored, derived);
+};
+
+const requireAuth = (req, res, next) => {
+  if (!authConfig) {
+    res.status(401).json({ error: "Set an editing password to continue." });
+    return;
+  }
+  if (!isAuthenticated(req)) {
+    res.status(401).json({ error: "Authentication required." });
+    return;
+  }
+  next();
+};
 
 const isPrivateIpv4 = (ip) => {
   const parts = ip.split(".").map((part) => Number(part));
@@ -57,6 +141,62 @@ const restrictMutationsToLocal = (req, res, next) => {
   }
   next();
 };
+
+app.get("/api/auth/status", (req, res) => {
+  res.json({
+    configured: Boolean(authConfig),
+    authenticated: isAuthenticated(req),
+  });
+});
+
+app.post("/api/auth/setup", async (req, res) => {
+  if (authConfig) {
+    res.status(400).json({ error: "Password already configured." });
+    return;
+  }
+  const password = typeof req.body.password === "string" ? req.body.password : "";
+  if (password.length < PASSWORD_MIN_LENGTH) {
+    res.status(400).json({ error: `Password must be at least ${PASSWORD_MIN_LENGTH} characters.` });
+    return;
+  }
+  const nextConfig = createPasswordHash(password);
+  await fs.promises.writeFile(AUTH_FILE, JSON.stringify(nextConfig, null, 2));
+  authConfig = nextConfig;
+  const token = crypto.randomBytes(24).toString("base64url");
+  sessionTokens.add(token);
+  setSessionCookie(req, res, token);
+  res.json({ ok: true });
+});
+
+app.post("/api/auth/login", (req, res) => {
+  if (!authConfig) {
+    res.status(400).json({ error: "No password configured yet." });
+    return;
+  }
+  const password = typeof req.body.password === "string" ? req.body.password : "";
+  if (!password) {
+    res.status(400).json({ error: "Password is required." });
+    return;
+  }
+  const valid = verifyPassword(password, authConfig);
+  if (!valid) {
+    res.status(401).json({ error: "Incorrect password." });
+    return;
+  }
+  const token = crypto.randomBytes(24).toString("base64url");
+  sessionTokens.add(token);
+  setSessionCookie(req, res, token);
+  res.json({ ok: true });
+});
+
+app.post("/api/auth/logout", (req, res) => {
+  const token = getAuthToken(req);
+  if (token) {
+    sessionTokens.delete(token);
+  }
+  clearSessionCookie(res);
+  res.json({ ok: true });
+});
 
 app.get("/music/:project/:file", async (req, res, next) => {
   try {
@@ -241,7 +381,7 @@ app.get("/project/:name", async (req, res, next) => {
   }
 });
 
-app.post("/api/projects", restrictMutationsToLocal, async (req, res) => {
+app.post("/api/projects", restrictMutationsToLocal, requireAuth, async (req, res) => {
   try {
     await ensureMusicDir();
     const rawName = typeof req.body.name === "string" ? req.body.name : "";
@@ -274,7 +414,7 @@ app.post("/api/projects", restrictMutationsToLocal, async (req, res) => {
   }
 });
 
-app.put("/api/projects/:name", restrictMutationsToLocal, async (req, res) => {
+app.put("/api/projects/:name", restrictMutationsToLocal, requireAuth, async (req, res) => {
   try {
     await ensureMusicDir();
     const currentName = req.params.name;
@@ -306,7 +446,7 @@ app.put("/api/projects/:name", restrictMutationsToLocal, async (req, res) => {
   }
 });
 
-app.delete("/api/projects/:name", restrictMutationsToLocal, async (req, res) => {
+app.delete("/api/projects/:name", restrictMutationsToLocal, requireAuth, async (req, res) => {
   try {
     await ensureMusicDir();
     const projectName = req.params.name;
@@ -358,7 +498,7 @@ const upload = multer({
   },
 });
 
-app.post("/api/projects/:name/upload", restrictMutationsToLocal, (req, res) => {
+app.post("/api/projects/:name/upload", restrictMutationsToLocal, requireAuth, (req, res) => {
   upload.single("demo")(req, res, (error) => {
     if (error) {
       res.status(400).json({ error: error.message });
@@ -368,7 +508,7 @@ app.post("/api/projects/:name/upload", restrictMutationsToLocal, (req, res) => {
   });
 });
 
-app.put("/api/projects/:name/demos/:file", restrictMutationsToLocal, async (req, res) => {
+app.put("/api/projects/:name/demos/:file", restrictMutationsToLocal, requireAuth, async (req, res) => {
   try {
     const projectName = req.params.name;
     const currentFile = req.params.file;
@@ -402,7 +542,7 @@ app.put("/api/projects/:name/demos/:file", restrictMutationsToLocal, async (req,
   }
 });
 
-app.delete("/api/projects/:name/demos/:file", restrictMutationsToLocal, async (req, res) => {
+app.delete("/api/projects/:name/demos/:file", restrictMutationsToLocal, requireAuth, async (req, res) => {
   try {
     const projectName = req.params.name;
     const fileName = req.params.file;
