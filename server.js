@@ -2,6 +2,7 @@ const path = require("path");
 const fs = require("fs");
 const express = require("express");
 const chokidar = require("chokidar");
+const multer = require("multer");
 
 const app = express();
 const PORT = process.env.PORT || 3119;
@@ -12,6 +13,8 @@ app.set("view engine", "ejs");
 app.set("views", path.join(__dirname, "views"));
 
 app.use("/static", express.static(path.join(__dirname, "public")));
+app.use(express.json());
+app.use(express.urlencoded({ extended: false }));
 
 app.get("/music/:project/:file", async (req, res, next) => {
   try {
@@ -74,6 +77,18 @@ const ensureMusicDir = async () => {
   await fs.promises.mkdir(MUSIC_DIR, { recursive: true });
 };
 
+const resolveProjectPath = (projectName) => {
+  const projectPath = path.resolve(MUSIC_DIR, projectName);
+  if (!projectPath.startsWith(MUSIC_DIR + path.sep)) {
+    throw new Error("Invalid project path");
+  }
+  return projectPath;
+};
+
+const toSafeName = (value) => value.trim().replace(/[/\\]/g, "");
+
+const toSafeFileName = (value) => path.basename(value).replace(/[^a-zA-Z0-9._-]/g, "_");
+
 const getProjects = async () => {
   const entries = await fs.promises.readdir(MUSIC_DIR, { withFileTypes: true });
   const dirs = entries.filter((entry) => entry.isDirectory()).map((entry) => entry.name);
@@ -89,6 +104,8 @@ const getProjects = async () => {
           .filter((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".wav"))
           .map((entry) => entry.name);
 
+        const hasDemos = wavFiles.length > 0;
+
         if (wavFiles.length > 0) {
           const stats = await Promise.all(
             wavFiles.map(async (file) => {
@@ -99,11 +116,13 @@ const getProjects = async () => {
           );
           latestDemoMs = Math.max(...stats);
         }
+
+        return { name, latestDemoMs, hasDemos };
       } catch (error) {
         console.warn(`Unable to read project ${name}`, error);
       }
 
-      return { name, latestDemoMs };
+      return { name, latestDemoMs, hasDemos: false };
     })
   );
 
@@ -164,7 +183,7 @@ app.get("/project/:name", async (req, res, next) => {
   try {
     await ensureMusicDir();
     const projectName = req.params.name;
-    const projectPath = path.join(MUSIC_DIR, projectName);
+    const projectPath = resolveProjectPath(projectName);
 
     const exists = fs.existsSync(projectPath) && fs.statSync(projectPath).isDirectory();
     if (!exists) {
@@ -177,6 +196,190 @@ app.get("/project/:name", async (req, res, next) => {
     res.render("project", { projectName, demos, projects });
   } catch (error) {
     next(error);
+  }
+});
+
+app.post("/api/projects", async (req, res) => {
+  try {
+    await ensureMusicDir();
+    const rawName = typeof req.body.name === "string" ? req.body.name : "";
+    const rawNote = typeof req.body.note === "string" ? req.body.note : "";
+    const projectName = toSafeName(rawName);
+
+    if (!projectName) {
+      res.status(400).json({ error: "Project name is required." });
+      return;
+    }
+
+    const projectPath = resolveProjectPath(projectName);
+
+    try {
+      await fs.promises.mkdir(projectPath, { recursive: false });
+    } catch (error) {
+      if (error.code === "EEXIST") {
+        res.status(409).json({ error: "Project already exists." });
+        return;
+      }
+      throw error;
+    }
+
+    const projectData = { note: rawNote.trim() };
+    await fs.promises.writeFile(path.join(projectPath, "project.json"), JSON.stringify(projectData, null, 2));
+
+    res.status(201).json({ projectName });
+  } catch (error) {
+    res.status(500).json({ error: "Unable to create project." });
+  }
+});
+
+app.put("/api/projects/:name", async (req, res) => {
+  try {
+    await ensureMusicDir();
+    const currentName = req.params.name;
+    const rawName = typeof req.body.name === "string" ? req.body.name : "";
+    const nextName = toSafeName(rawName);
+
+    if (!nextName) {
+      res.status(400).json({ error: "Project name is required." });
+      return;
+    }
+
+    const currentPath = resolveProjectPath(currentName);
+    const nextPath = resolveProjectPath(nextName);
+
+    if (!fs.existsSync(currentPath)) {
+      res.status(404).json({ error: "Project not found." });
+      return;
+    }
+
+    if (fs.existsSync(nextPath)) {
+      res.status(409).json({ error: "Project already exists." });
+      return;
+    }
+
+    await fs.promises.rename(currentPath, nextPath);
+    res.json({ projectName: nextName });
+  } catch (error) {
+    res.status(500).json({ error: "Unable to rename project." });
+  }
+});
+
+app.delete("/api/projects/:name", async (req, res) => {
+  try {
+    await ensureMusicDir();
+    const projectName = req.params.name;
+    const projectPath = resolveProjectPath(projectName);
+
+    if (!fs.existsSync(projectPath)) {
+      res.status(404).json({ error: "Project not found." });
+      return;
+    }
+
+    const entries = await fs.promises.readdir(projectPath, { withFileTypes: true });
+    const hasWav = entries.some((entry) => entry.isFile() && entry.name.toLowerCase().endsWith(".wav"));
+    if (hasWav) {
+      res.status(400).json({ error: "Project has demo files and cannot be deleted." });
+      return;
+    }
+
+    await fs.promises.rm(projectPath, { recursive: true, force: true });
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ error: "Unable to delete project." });
+  }
+});
+
+const uploadStorage = multer.diskStorage({
+  destination: async (req, _file, cb) => {
+    try {
+      await ensureMusicDir();
+      const projectPath = resolveProjectPath(req.params.name);
+      await fs.promises.mkdir(projectPath, { recursive: true });
+      cb(null, projectPath);
+    } catch (error) {
+      cb(error);
+    }
+  },
+  filename: (_req, file, cb) => {
+    cb(null, toSafeFileName(file.originalname));
+  },
+});
+
+const upload = multer({
+  storage: uploadStorage,
+  fileFilter: (_req, file, cb) => {
+    if (path.extname(file.originalname).toLowerCase() !== ".wav") {
+      cb(new Error("Only .wav files are allowed."));
+      return;
+    }
+    cb(null, true);
+  },
+});
+
+app.post("/api/projects/:name/upload", (req, res) => {
+  upload.single("demo")(req, res, (error) => {
+    if (error) {
+      res.status(400).json({ error: error.message });
+      return;
+    }
+    res.status(201).json({ ok: true });
+  });
+});
+
+app.put("/api/projects/:name/demos/:file", async (req, res) => {
+  try {
+    const projectName = req.params.name;
+    const currentFile = req.params.file;
+    const rawName = typeof req.body.name === "string" ? req.body.name : "";
+    const nextName = toSafeFileName(rawName);
+
+    if (!nextName) {
+      res.status(400).json({ error: "Demo name is required." });
+      return;
+    }
+
+    const safeNextName = nextName.toLowerCase().endsWith(".wav") ? nextName : `${nextName}.wav`;
+    const projectPath = resolveProjectPath(projectName);
+    const currentPath = path.resolve(projectPath, currentFile);
+    const nextPath = path.resolve(projectPath, safeNextName);
+
+    if (!currentPath.startsWith(projectPath + path.sep) || !nextPath.startsWith(projectPath + path.sep)) {
+      res.status(400).json({ error: "Invalid demo file." });
+      return;
+    }
+
+    if (!fs.existsSync(currentPath)) {
+      res.status(404).json({ error: "Demo file not found." });
+      return;
+    }
+
+    await fs.promises.rename(currentPath, nextPath);
+    res.json({ ok: true });
+  } catch (error) {
+    res.status(500).json({ error: "Unable to rename demo." });
+  }
+});
+
+app.delete("/api/projects/:name/demos/:file", async (req, res) => {
+  try {
+    const projectName = req.params.name;
+    const fileName = req.params.file;
+    const projectPath = resolveProjectPath(projectName);
+    const filePath = path.resolve(projectPath, fileName);
+
+    if (!filePath.startsWith(projectPath + path.sep)) {
+      res.status(400).json({ error: "Invalid demo file." });
+      return;
+    }
+
+    await fs.promises.unlink(filePath);
+    res.json({ ok: true });
+  } catch (error) {
+    if (error.code === "ENOENT") {
+      res.status(404).json({ error: "Demo file not found." });
+      return;
+    }
+    res.status(500).json({ error: "Unable to delete demo." });
   }
 });
 

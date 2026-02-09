@@ -6,7 +6,7 @@
     <title><%= projectName ? `${projectName} | Music Projects` : "Music Projects" %></title>
     <link rel="stylesheet" href="/static/styles.css" />
   </head>
-  <body>
+  <body data-project-name="<%= projectName || "" %>">
     <div class="app-shell">
       <aside class="sidebar" data-sidebar>
         <div class="sidebar__header">
@@ -14,20 +14,38 @@
             <p class="sidebar__eyebrow">Music Projects</p>
             <h1 class="sidebar__title">Launchbay Records</h1>
           </div>
-          <button class="sidebar__close" type="button" data-sidebar-toggle aria-label="Toggle project list">☰</button>
+          <div class="sidebar__header-actions">
+            <button class="icon-button ghost-button" type="button" data-new-project aria-label="Create new project">＋</button>
+            <button class="sidebar__close" type="button" data-sidebar-toggle aria-label="Toggle project list">☰</button>
+          </div>
         </div>
         <% if (projects.length === 0) { %>
-          <p class="sidebar__empty">No projects yet. Add folders in <code>music</code>.</p>
+          <p class="sidebar__empty">No projects yet. Add folders in <code>music</code> or hit the + button.</p>
         <% } else { %>
           <nav class="sidebar__nav">
             <% projects.forEach((project) => { %>
-              <a
-                class="sidebar__link <%= projectName === project.name ? 'is-active' : '' %>"
-                href="/project/<%= encodeURIComponent(project.name) %>"
-              >
-                <span><%= project.name %></span>
-                <span class="sidebar__meta">Latest demo</span>
-              </a>
+              <div class="sidebar__item">
+                <a
+                  class="sidebar__link <%= projectName === project.name ? 'is-active' : '' %>"
+                  href="/project/<%= encodeURIComponent(project.name) %>"
+                >
+                  <span><%= project.name %></span>
+                  <span class="sidebar__meta">Latest demo</span>
+                </a>
+                <div class="menu" data-menu>
+                  <button class="menu__trigger" type="button" data-menu-trigger aria-label="Project options">⋮</button>
+                  <div class="menu__content">
+                    <button class="menu__item" type="button" data-action="rename-project" data-project="<%= project.name %>">
+                      Rename
+                    </button>
+                    <% if (!project.hasDemos) { %>
+                      <button class="menu__item menu__item--danger" type="button" data-action="delete-project" data-project="<%= project.name %>">
+                        Delete
+                      </button>
+                    <% } %>
+                  </div>
+                </div>
+              </div>
             <% }) %>
           </nav>
         <% } %>
@@ -45,8 +63,10 @@
             </p>
           </div>
           <div class="main__actions">
-            <button class="ghost-button" type="button" data-sidebar-toggle aria-label="Toggle project list">☰</button>
+            <button class="ghost-button ghost-button--mobile" type="button" data-sidebar-toggle aria-label="Toggle project list">☰</button>
             <% if (projectName) { %>
+              <input class="sr-only" type="file" accept=".wav" data-upload-input />
+              <button class="primary-button" type="button" data-upload-button>Upload demo</button>
               <button
                 class="primary-button icon-button"
                 type="button"
@@ -94,11 +114,36 @@
                   <p class="demo-version">version <%= demos[0].displayName %></p>
                   <p class="demo-modified">Modified <%= demos[0].modifiedAtLabel %></p>
                 </div>
-                <audio
-                  controls
-                  preload="metadata"
-                  src="/music/<%= encodeURIComponent(projectName) %>/<%= encodeURIComponent(demos[0].name) %>"
-                ></audio>
+                <div class="demo-card__actions">
+                  <audio
+                    controls
+                    preload="metadata"
+                    src="/music/<%= encodeURIComponent(projectName) %>/<%= encodeURIComponent(demos[0].name) %>"
+                  ></audio>
+                  <div class="menu" data-menu>
+                    <button class="menu__trigger" type="button" data-menu-trigger aria-label="Demo options">⋮</button>
+                    <div class="menu__content">
+                      <button
+                        class="menu__item"
+                        type="button"
+                        data-action="rename-demo"
+                        data-project="<%= projectName %>"
+                        data-demo="<%= demos[0].name %>"
+                      >
+                        Rename
+                      </button>
+                      <button
+                        class="menu__item menu__item--danger"
+                        type="button"
+                        data-action="delete-demo"
+                        data-project="<%= projectName %>"
+                        data-demo="<%= demos[0].name %>"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </section>
             <% if (demos.length > 1) { %>
@@ -112,11 +157,36 @@
                         <p class="demo-version">version <%= demo.displayName %></p>
                         <p class="demo-modified">Modified <%= demo.modifiedAtLabel %></p>
                       </div>
-                      <audio
-                        controls
-                        preload="none"
-                        src="/music/<%= encodeURIComponent(projectName) %>/<%= encodeURIComponent(demo.name) %>"
-                      ></audio>
+                      <div class="demo-card__actions">
+                        <audio
+                          controls
+                          preload="none"
+                          src="/music/<%= encodeURIComponent(projectName) %>/<%= encodeURIComponent(demo.name) %>"
+                        ></audio>
+                        <div class="menu" data-menu>
+                          <button class="menu__trigger" type="button" data-menu-trigger aria-label="Demo options">⋮</button>
+                          <div class="menu__content">
+                            <button
+                              class="menu__item"
+                              type="button"
+                              data-action="rename-demo"
+                              data-project="<%= projectName %>"
+                              data-demo="<%= demo.name %>"
+                            >
+                              Rename
+                            </button>
+                            <button
+                              class="menu__item menu__item--danger"
+                              type="button"
+                              data-action="delete-demo"
+                              data-project="<%= projectName %>"
+                              data-demo="<%= demo.name %>"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      </div>
                     </div>
                   <% }) %>
                 </div>
@@ -125,6 +195,26 @@
           <% } %>
         </section>
       </main>
+    </div>
+    <div class="modal" data-modal="new-project" aria-hidden="true">
+      <div class="modal__backdrop" data-modal-close></div>
+      <div class="modal__panel" role="dialog" aria-modal="true" aria-labelledby="new-project-title">
+        <h3 class="modal__title" id="new-project-title">Create new project</h3>
+        <form data-new-project-form>
+          <label class="field">
+            <span class="field__label">Project name</span>
+            <input class="field__input" type="text" name="name" required placeholder="New project" />
+          </label>
+          <label class="field">
+            <span class="field__label">Short note</span>
+            <textarea class="field__input" name="note" rows="3" placeholder="Rock, slow, somber"></textarea>
+          </label>
+          <div class="modal__actions">
+            <button class="ghost-button" type="button" data-modal-close>Cancel</button>
+            <button class="primary-button" type="submit">Create project</button>
+          </div>
+        </form>
+      </div>
     </div>
     <script>
       const events = new EventSource("/events");
@@ -161,6 +251,186 @@
           }
         });
       }
+
+      const newProjectButton = document.querySelector("[data-new-project]");
+      const newProjectModal = document.querySelector('[data-modal="new-project"]');
+      const newProjectForm = document.querySelector("[data-new-project-form]");
+
+      const openModal = (modal) => {
+        if (!modal) return;
+        modal.classList.add("is-open");
+        modal.setAttribute("aria-hidden", "false");
+        const firstInput = modal.querySelector("input, textarea");
+        if (firstInput) {
+          firstInput.focus();
+        }
+      };
+
+      const closeModal = (modal) => {
+        if (!modal) return;
+        modal.classList.remove("is-open");
+        modal.setAttribute("aria-hidden", "true");
+      };
+
+      if (newProjectButton && newProjectModal) {
+        newProjectButton.addEventListener("click", () => openModal(newProjectModal));
+        newProjectModal.querySelectorAll("[data-modal-close]").forEach((button) => {
+          button.addEventListener("click", () => closeModal(newProjectModal));
+        });
+      }
+
+      if (newProjectForm) {
+        newProjectForm.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const formData = new FormData(newProjectForm);
+          const name = formData.get("name").toString().trim();
+          const note = formData.get("note").toString().trim();
+
+          if (!name) {
+            alert("Please provide a project name.");
+            return;
+          }
+
+          try {
+            const response = await fetch("/api/projects", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ name, note }),
+            });
+
+            if (!response.ok) {
+              const data = await response.json().catch(() => ({}));
+              alert(data.error || "Unable to create project.");
+              return;
+            }
+
+            const data = await response.json();
+            window.location.href = `/project/${encodeURIComponent(data.projectName)}`;
+          } catch (error) {
+            console.warn("Unable to create project", error);
+            alert("Unable to create project.");
+          }
+        });
+      }
+
+      const uploadButton = document.querySelector("[data-upload-button]");
+      const uploadInput = document.querySelector("[data-upload-input]");
+      const projectName = document.body.dataset.projectName;
+
+      if (uploadButton && uploadInput && projectName) {
+        uploadButton.addEventListener("click", () => uploadInput.click());
+        uploadInput.addEventListener("change", async () => {
+          const file = uploadInput.files[0];
+          if (!file) return;
+          const formData = new FormData();
+          formData.append("demo", file);
+
+          try {
+            const response = await fetch(`/api/projects/${encodeURIComponent(projectName)}/upload`, {
+              method: "POST",
+              body: formData,
+            });
+            if (!response.ok) {
+              const data = await response.json().catch(() => ({}));
+              alert(data.error || "Unable to upload demo.");
+              return;
+            }
+            window.location.reload();
+          } catch (error) {
+            console.warn("Unable to upload demo", error);
+            alert("Unable to upload demo.");
+          } finally {
+            uploadInput.value = "";
+          }
+        });
+      }
+
+      const menus = document.querySelectorAll("[data-menu]");
+      const closeMenus = () => {
+        menus.forEach((menu) => menu.classList.remove("is-open"));
+      };
+
+      menus.forEach((menu) => {
+        const trigger = menu.querySelector("[data-menu-trigger]");
+        if (!trigger) return;
+        trigger.addEventListener("click", (event) => {
+          event.stopPropagation();
+          const isOpen = menu.classList.contains("is-open");
+          closeMenus();
+          if (!isOpen) {
+            menu.classList.add("is-open");
+          }
+        });
+      });
+
+      document.addEventListener("click", () => closeMenus());
+
+      const requestJson = async (url, options) => {
+        const response = await fetch(url, {
+          headers: { "Content-Type": "application/json" },
+          ...options,
+        });
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error || "Request failed.");
+        }
+        return response.json().catch(() => ({}));
+      };
+
+      document.addEventListener("click", async (event) => {
+        const actionButton = event.target.closest("[data-action]");
+        if (!actionButton) return;
+
+        const action = actionButton.dataset.action;
+        const actionProject = actionButton.dataset.project;
+        const actionDemo = actionButton.dataset.demo;
+
+        try {
+          if (action === "rename-project") {
+            const name = window.prompt("Rename project", actionProject);
+            if (!name) return;
+            const data = await requestJson(`/api/projects/${encodeURIComponent(actionProject)}`, {
+              method: "PUT",
+              body: JSON.stringify({ name }),
+            });
+            window.location.href = `/project/${encodeURIComponent(data.projectName)}`;
+          }
+
+          if (action === "delete-project") {
+            const confirmDelete = window.confirm("Delete this project?");
+            if (!confirmDelete) return;
+            await requestJson(`/api/projects/${encodeURIComponent(actionProject)}`, { method: "DELETE" });
+            window.location.href = "/";
+          }
+
+          if (action === "rename-demo") {
+            const name = window.prompt("Rename demo file", actionDemo);
+            if (!name) return;
+            await requestJson(
+              `/api/projects/${encodeURIComponent(actionProject)}/demos/${encodeURIComponent(actionDemo)}`,
+              {
+                method: "PUT",
+                body: JSON.stringify({ name }),
+              }
+            );
+            window.location.reload();
+          }
+
+          if (action === "delete-demo") {
+            const confirmDelete = window.confirm("Delete this demo file?");
+            if (!confirmDelete) return;
+            await requestJson(
+              `/api/projects/${encodeURIComponent(actionProject)}/demos/${encodeURIComponent(actionDemo)}`,
+              {
+                method: "DELETE",
+              }
+            );
+            window.location.reload();
+          }
+        } catch (error) {
+          alert(error.message);
+        }
+      });
 
     </script>
   </body>
